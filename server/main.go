@@ -1,9 +1,14 @@
-package server
+package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net"
+	"strings"
+
+	"github.com/HYmian/boot2Cluster/conf"
+	"github.com/HYmian/boot2Cluster/connector"
 )
 
 var (
@@ -14,15 +19,17 @@ func main() {
 	flag.Parse()
 	log.SetFlags(log.LstdFlags)
 
-	l, err := net.ListenTCP("tcp4", &net.TCPAddr{
-		IP:   []byte("0.0.0.0"),
-		Port: 34616,
-	})
+	l, err := net.ListenTCP(
+		"tcp4",
+		&net.TCPAddr{
+			IP:   net.IPv4(0, 0, 0, 0),
+			Port: 34616,
+		})
 	if err != nil {
 		log.Fatalf("start listen error: %s", err.Error())
 	}
 
-	c := make(chan net.Conn, 10)
+	c := make(chan *connector.Conn, 10)
 	go waitConn(c)
 
 	for {
@@ -32,18 +39,18 @@ func main() {
 			continue
 		}
 
-		c <- conn
+		c <- connector.NewConn(conn)
 	}
 }
 
-func waitConn(c <-chan net.Conn) {
-	num := 10
+func waitConn(c <-chan *connector.Conn) {
+	num := 3
 
 	for {
 		select {
 		case conn := <-c:
 			agent := conn.RemoteAddr().String()
-			log.Println(agent) // TODO
+			ip := strings.Split(agent, ":")[0]
 
 			if num == 0 {
 				//new agent
@@ -53,11 +60,26 @@ func waitConn(c <-chan net.Conn) {
 
 			if num == 0 {
 				//init cluster
+				if err := conf.Exec("start-dfs.sh"); err != nil {
+					log.Printf("exec start-dfs.sh error: %s", err.Error())
+					break
+				}
 			}
 
-			_, err := conn.Write([]byte("OK"))
+			data, err := conn.ReadPacket()
 			if err != nil {
 				log.Printf("write to agent ok error: %s", err.Error())
+			}
+
+			if data[0] == connector.COM_REGISTER {
+				cmd := fmt.Sprintf(`echo "%s %s" >> $HADOOP_HOME/etc/hadoop/slaves`, ip, data[1:])
+				if err := conf.Exec(cmd); err != nil {
+					log.Println("exec register error: %s", err.Error())
+					break
+				}
+
+				log.Printf("%s %s", ip, data[1:])
+				conn.Close()
 			}
 		}
 	}
