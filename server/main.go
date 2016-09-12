@@ -44,7 +44,7 @@ func main() {
 }
 
 func waitConn(c <-chan *connector.Conn) {
-	num := 3
+	num := 2
 
 	for {
 		select {
@@ -72,13 +72,18 @@ func waitConn(c <-chan *connector.Conn) {
 			}
 
 			if data[0] == connector.COM_REGISTER {
-				cmd := fmt.Sprintf(`echo "%s %s" >> $HADOOP_HOME/etc/hadoop/slaves`, ip, data[1:])
+				cmd := fmt.Sprintf(`echo %s >> $HADOOP_HOME/etc/hadoop/slaves`, data[1:])
 				if err := conf.Exec(cmd); err != nil {
-					log.Println("exec register error: %s", err.Error())
+					log.Printf("exec register error: %s", err.Error())
 					break
 				}
 
-				log.Printf("%s %s", ip, data[1:])
+				cmd = fmt.Sprintf(`echo "%s %s" >> /etc/hosts`, ip, data[1:])
+				if err := conf.Exec(cmd); err != nil {
+					log.Printf("exec register error: %s", err.Error())
+					break
+				}
+
 				conn.Close()
 			}
 		}
