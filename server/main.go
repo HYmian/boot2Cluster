@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"net"
 	"strings"
@@ -12,25 +11,35 @@ import (
 )
 
 var (
-	clusterNum *string = flag.String("n", "0", "设置集群数量")
+	clusterNum *uint   = flag.Uint("n", 0, "设置集群数量")
+	port       *int    = flag.Int("p", 34616, "监听端口")
+	config     *string = flag.String("conf", "./conf.yml", "配置文件路径")
 )
 
 func main() {
 	flag.Parse()
 	log.SetFlags(log.LstdFlags)
 
+	cfg, err := conf.LoadConfig(*config)
+	if err != nil {
+		log.Printf("load config error: %s", err.Error())
+	}
+
+	boot := conf.NewBoot(cfg, *clusterNum)
+
 	l, err := net.ListenTCP(
 		"tcp4",
 		&net.TCPAddr{
 			IP:   net.IPv4(0, 0, 0, 0),
-			Port: 34616,
+			Port: *port,
 		})
 	if err != nil {
 		log.Fatalf("start listen error: %s", err.Error())
 	}
+	log.Printf("start listen in 0.0.0.0:%d", *port)
 
 	c := make(chan *connector.Conn, 10)
-	go waitConn(c)
+	go waitConn(c, boot)
 
 	for {
 		conn, err := l.AcceptTCP()
@@ -38,32 +47,30 @@ func main() {
 			log.Printf("accept conn error: %s", err.Error())
 			continue
 		}
+		log.Printf("accept a connection from %s", conn.RemoteAddr().String())
 
 		c <- connector.NewConn(conn)
 	}
 }
 
-func waitConn(c <-chan *connector.Conn) {
-	num := 2
-
+func waitConn(c <-chan *connector.Conn, boot *conf.Boot) {
 	for {
+		i := uint(0)
 		select {
 		case conn := <-c:
 			agent := conn.RemoteAddr().String()
 			ip := strings.Split(agent, ":")[0]
 
-			if num == 0 {
+			if *clusterNum <= i {
 				//new agent
+				break
 			}
 
-			num--
+			i++
 
-			if num == 0 {
-				//init cluster
-				if err := conf.Exec("start-dfs.sh"); err != nil {
-					log.Printf("exec start-dfs.sh error: %s", err.Error())
-					break
-				}
+			if err := conn.WriteRegister(); err != nil {
+				log.Printf("register to agent error: %s", err.Error())
+				break
 			}
 
 			data, err := conn.ReadPacket()
@@ -72,19 +79,17 @@ func waitConn(c <-chan *connector.Conn) {
 			}
 
 			if data[0] == connector.COM_REGISTER {
-				cmd := fmt.Sprintf(`echo %s >> $HADOOP_HOME/etc/hadoop/slaves`, data[1:])
-				if err := conf.Exec(cmd); err != nil {
-					log.Printf("exec register error: %s", err.Error())
-					break
-				}
-
-				cmd = fmt.Sprintf(`echo "%s %s" >> /etc/hosts`, ip, data[1:])
-				if err := conf.Exec(cmd); err != nil {
-					log.Printf("exec register error: %s", err.Error())
-					break
-				}
+				boot.AddNode(string(data[1:]), ip, i)
 
 				conn.Close()
+			}
+
+			if *clusterNum == i {
+				//init cluster
+				if err := boot.ExecBootCommand(); err != nil {
+					log.Printf("exec start-dfs.sh error: %s", err.Error())
+				}
+				break
 			}
 		}
 	}

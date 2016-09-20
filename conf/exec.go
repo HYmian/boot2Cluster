@@ -1,10 +1,16 @@
 package conf
 
-import "os/exec"
+import (
+	"fmt"
+	"log"
+	"os/exec"
+)
 
 func Exec(command string) error {
-	var cmd *exec.Cmd
-	cmd = exec.Command("bash", "-c", command)
+	log.Printf("begin command: [%s]", command)
+	out, err := exec.Command("bash", "-c", command).CombinedOutput()
+	fmt.Println(string(out))
+	log.Printf("finish command: [%s]", command)
 
-	return cmd.Run()
+	return err
 }

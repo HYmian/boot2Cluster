@@ -1,0 +1,6 @@
+register:
+    - regular: "{{ .Host }}"
+      file: "./slaves.test"
+    - regular: "{{ .IP }} {{ .Host }}"
+      file: "./hosts.test"
+bootCommand: "start-dfs.sh; start-yarn.sh; start-hbase.sh"
