@@ -57,7 +57,7 @@ func NewBoot(cfg *Config, clusterNum uint) *Boot {
 		t := template.Must(
 			template.New(v.File).Parse(
 				fmt.Sprintf(
-					"%s{{ range .}}\n%s{{ end }}",
+					"%s{{ range .}}%s\n{{ end }}",
 					data,
 					v.Regular,
 				),

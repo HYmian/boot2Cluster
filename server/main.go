@@ -54,17 +54,12 @@ func main() {
 }
 
 func waitConn(c <-chan *connector.Conn, boot *conf.Boot) {
+	i := uint(0)
 	for {
-		i := uint(0)
 		select {
 		case conn := <-c:
 			agent := conn.RemoteAddr().String()
 			ip := strings.Split(agent, ":")[0]
-
-			if *clusterNum <= i {
-				//new agent
-				break
-			}
 
 			i++
 
