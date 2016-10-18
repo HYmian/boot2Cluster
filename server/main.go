@@ -79,10 +79,17 @@ func waitConn(c <-chan *connector.Conn, boot *conf.Boot) {
 				conn.Close()
 			}
 
-			if *clusterNum == i {
+			if boot.LiveCommand != "" {
+				if err = boot.ExecLiveCommand(); err != nil {
+					log.Printf("exec live command error: %s", err.Error())
+					break
+				}
+			}
+
+			if *clusterNum == i && boot.BootCommand != "" {
 				//init cluster
 				if err := boot.ExecBootCommand(); err != nil {
-					log.Printf("exec start-dfs.sh error: %s", err.Error())
+					log.Printf("exec boot command error: %s", err.Error())
 				}
 				break
 			}
