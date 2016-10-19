@@ -6,6 +6,9 @@ import (
 	"net"
 	"strings"
 
+	"golang.org/x/net/context"
+	"google.golang.org/grpc"
+
 	"github.com/HYmian/boot2Cluster/conf"
 	"github.com/HYmian/boot2Cluster/connector"
 )
@@ -25,6 +28,21 @@ func main() {
 	}
 
 	boot := conf.NewBoot(cfg, 1)
+
+	co, err := grpc.Dial(*server, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer co.Close()
+	cc := connector.NewRegisterClient(co)
+
+	_, err = cc.Notify(context.Background(),
+		&connector.Inform{Node: map[string]string{"host": "airCraft"}},
+	)
+	if err != nil {
+		log.Printf("notify error: %s", err.Error())
+	}
+	return
 
 	conn, err := net.Dial("tcp4", *server)
 	if err != nil {

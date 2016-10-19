@@ -4,11 +4,7 @@ import (
 	"sort"
 )
 
-type Node struct {
-	Host     string
-	IP       string
-	Sequence uint
-}
+type Node map[string]string
 
 type Nodes []Node
 
@@ -21,22 +17,22 @@ func (n Nodes) Swap(i, j int) {
 }
 
 func (n Nodes) Less(i, j int) bool {
-	return n[i].Host < n[j].Host
+	return n[i]["Host"] < n[j]["Host"]
 }
 
-func (b *Boot) AddNode(host, ip string, sequence uint) error {
+func (b *Boot) AddNode(node Node) error {
 	if len(b.Nodes) == 0 {
-		b.Nodes = append(b.Nodes, Node{Host: host, IP: ip, Sequence: sequence})
+		b.Nodes = append(b.Nodes, node)
 		b.Entry()
 	}
 
 	i := sort.Search(len(b.Nodes), func(i int) bool {
-		return b.Nodes[i].Host >= host
+		return b.Nodes[i]["Host"] >= node["Host"]
 	})
-	if i < len(b.Nodes) && b.Nodes[i].Host == host {
-		b.Nodes[i].IP = ip
+	if i < len(b.Nodes) && b.Nodes[i]["Host"] == node["Host"] {
+		b.Nodes[i]["IP"] = node["IP"]
 	} else {
-		b.Nodes = append(b.Nodes, Node{Host: host, IP: ip, Sequence: sequence})
+		b.Nodes = append(b.Nodes, node)
 		sort.Sort(Nodes(b.Nodes))
 	}
 

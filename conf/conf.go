@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"sync"
 
 	"gopkg.in/yaml.v2"
 )
@@ -41,6 +42,8 @@ type Boot struct {
 	BootCommand string
 	LiveCommand string
 	Nodes       []Node
+
+	mutex *sync.Mutex
 }
 
 func NewBoot(cfg *Config, clusterNum uint) *Boot {
@@ -74,6 +77,7 @@ func NewBoot(cfg *Config, clusterNum uint) *Boot {
 		BootCommand: cfg.BootCommand,
 		LiveCommand: cfg.LiveCommand,
 		Nodes:       make([]Node, 0, clusterNum),
+		mutex:       &sync.Mutex{},
 	}
 }
 
@@ -98,4 +102,10 @@ func (b *Boot) ExecBootCommand() error {
 
 func (b *Boot) ExecLiveCommand() error {
 	return Exec(b.LiveCommand)
+}
+
+func (b *Boot) GetNodes() Nodes {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	return b.Nodes
 }
