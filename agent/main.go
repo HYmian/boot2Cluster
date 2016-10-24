@@ -2,8 +2,10 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net"
+	"os"
 	"strings"
 
 	"golang.org/x/net/context"
@@ -14,57 +16,75 @@ import (
 )
 
 var (
-	server *string = flag.String("s", "", "server address and port")
-	config *string = flag.String("conf", "./conf.yml", "配置文件路径")
+	serverAddress *string = flag.String("s", "", "server address and port")
+	config        *string = flag.String("conf", "./conf.yml", "配置文件路径")
+	port          *int    = flag.Int("p", 8602, "监听端口")
+	host          *string = flag.String("host", "", "注册用的hostname")
+
+	boot *conf.Boot
 )
+
+type server struct{}
+
+func (s *server) Notify(ctx context.Context, in *connector.Notification) (*connector.Empty, error) {
+	boot.Nodes = make([]conf.Node, 0, len(in.Inform))
+	for _, inform := range in.Inform {
+		boot.Nodes = append(boot.Nodes, inform.Node)
+		log.Println(inform.Node)
+	}
+
+	boot.Entry()
+
+	return &connector.Empty{}, nil
+}
 
 func main() {
 	flag.Parse()
-	log.SetFlags(log.LstdFlags)
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	cfg, err := conf.LoadConfig(*config)
 	if err != nil {
 		log.Printf("load config error: %s", err.Error())
 	}
 
-	boot := conf.NewBoot(cfg, 1)
+	boot = conf.NewBoot(cfg, 1)
 
-	co, err := grpc.Dial(*server, grpc.WithInsecure())
+	address := strings.Split(*serverAddress, ";")
+
+	for _, a := range address {
+		co, err := grpc.Dial(a, grpc.WithInsecure())
+		if err != nil {
+			log.Fatalf("did not connect: %v", err)
+		}
+		c := connector.NewRegisterClient(co)
+
+		host, err := os.Hostname()
+		if err != nil {
+			log.Printf("get hostname error %s", err.Error())
+		}
+		_, err = c.Registe(context.Background(),
+			&connector.Inform{Node: map[string]string{"Host": host, "port": fmt.Sprintf("%d", *port)}},
+		)
+		if err != nil {
+			log.Printf("register error: %s", err.Error())
+		}
+		co.Close()
+	}
+
+	l, err := net.ListenTCP(
+		"tcp4",
+		&net.TCPAddr{
+			IP:   net.IPv4(0, 0, 0, 0),
+			Port: *port,
+		})
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		log.Fatalf("start listen error: %s", err.Error())
 	}
-	defer co.Close()
-	cc := connector.NewRegisterClient(co)
+	log.Printf("start listen in 0.0.0.0:%d", *port)
 
-	_, err = cc.Notify(context.Background(),
-		&connector.Inform{Node: map[string]string{"host": "airCraft"}},
-	)
-	if err != nil {
-		log.Printf("notify error: %s", err.Error())
+	s := grpc.NewServer()
+	connector.RegisterNotifierServer(s, &server{})
+	if err := s.Serve(l); err != nil {
+		log.Fatalf("failed to serve: %v", err)
 	}
-	return
-
-	conn, err := net.Dial("tcp4", *server)
-	if err != nil {
-		log.Fatalf("dail to server %s error: %s", server, err.Error())
-	}
-
-	c := connector.NewConn(conn)
-
-	agent := conn.RemoteAddr().String()
-	ip := strings.Split(agent, ":")[0]
-
-	data, err := c.ReadPacket()
-	if err != nil {
-		log.Printf("write to agent ok error: %s", err.Error())
-	}
-
-	if data[0] == connector.COM_REGISTER {
-		boot.AddNode(string(data[1:]), ip, 1)
-	}
-
-	if err = c.WriteRegister(); err != nil {
-		log.Printf("register to server error: %s", err.Error())
-	}
-	c.Close()
 }

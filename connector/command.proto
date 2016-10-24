@@ -33,19 +33,19 @@ package connector;
 
 // The greeting service definition.
 service Notifier {
-  rpc Notify(Inform) returns (Empty) {}
+  rpc Notify(Notification) returns (Empty) {}
 }
 
 service Register {
-  rpc Registe(Inform) returns (Notification){}
+  rpc Registe(Inform) returns (Empty){}
 }
 
 message Inform {
-  map<string, string> node = 1;
+  map<string, string> Node = 1;
 }
 
 message Notification {
-  repeated Inform inform = 1;
+  repeated Inform Inform = 1;
 }
 
 message Empty{}

@@ -103,9 +103,3 @@ func (b *Boot) ExecBootCommand() error {
 func (b *Boot) ExecLiveCommand() error {
 	return Exec(b.LiveCommand)
 }
-
-func (b *Boot) GetNodes() Nodes {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-	return b.Nodes
-}
