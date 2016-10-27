@@ -20,6 +20,7 @@ var (
 	config        *string = flag.String("conf", "./conf.yml", "配置文件路径")
 	port          *int    = flag.Int("p", 8602, "监听端口")
 	host          *string = flag.String("host", "", "注册用的hostname")
+	mode          *string = flag.String("mode", "client", "运行模式")
 
 	boot *conf.Boot
 )
@@ -63,12 +64,22 @@ func main() {
 			log.Printf("get hostname error %s", err.Error())
 		}
 		_, err = c.Registe(context.Background(),
-			&connector.Inform{Node: map[string]string{"Host": host, "port": fmt.Sprintf("%d", *port)}},
+			&connector.Inform{
+				Node: map[string]string{
+					"host": host,
+					"port": fmt.Sprintf("%d", *port),
+					"mode": *mode,
+				},
+			},
 		)
 		if err != nil {
 			log.Printf("register error: %s", err.Error())
 		}
 		co.Close()
+	}
+
+	if *mode == "client" {
+		return
 	}
 
 	l, err := net.ListenTCP(

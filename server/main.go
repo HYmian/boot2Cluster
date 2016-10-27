@@ -99,19 +99,24 @@ func waitConn(c <-chan conf.Node, boot *conf.Boot) {
 				}
 			}
 
+			if node["mode"] == "client" {
+				goto BOOT
+			}
+
 			for _, n := range boot.Nodes {
 				co, err := grpc.Dial(fmt.Sprintf("%s:%s", n["IP"], n["port"]), grpc.WithInsecure())
 				if err != nil {
-					log.Fatalf("did not connect to agent %s: %s", n["Host"], err.Error())
+					log.Fatalf("did not connect to agent %s: %s", n["host"], err.Error())
 				}
 				c := connector.NewNotifierClient(co)
 
 				if _, err := c.Notify(context.Background(), NewNotification(boot.Nodes)); err != nil {
-					log.Printf("notify to agent %s error: %s", n["Host"], err.Error())
+					log.Printf("notify to agent %s error: %s", n["host"], err.Error())
 				}
 				co.Close()
 			}
 
+		BOOT:
 			if *clusterNum == uint(len(boot.Nodes)) && boot.BootCommand != "" {
 				//init cluster
 				if err := boot.ExecBootCommand(); err != nil {

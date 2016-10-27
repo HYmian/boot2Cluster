@@ -17,7 +17,7 @@ func (n Nodes) Swap(i, j int) {
 }
 
 func (n Nodes) Less(i, j int) bool {
-	return n[i]["Host"] < n[j]["Host"]
+	return n[i]["host"] < n[j]["host"]
 }
 
 func (b *Boot) AddNode(node Node) error {
@@ -27,9 +27,9 @@ func (b *Boot) AddNode(node Node) error {
 	}
 
 	i := sort.Search(len(b.Nodes), func(i int) bool {
-		return b.Nodes[i]["Host"] >= node["Host"]
+		return b.Nodes[i]["host"] >= node["host"]
 	})
-	if i < len(b.Nodes) && b.Nodes[i]["Host"] == node["Host"] {
+	if i < len(b.Nodes) && b.Nodes[i]["host"] == node["host"] {
 		b.Nodes[i]["IP"] = node["IP"]
 	} else {
 		b.Nodes = append(b.Nodes, node)
